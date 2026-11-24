@@ -1,0 +1,432 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net: Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Global Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isBootstrapAdmin() {
+      return isVerified() && request.auth.token.email == 'tiagozamba10@gmail.com';
+    }
+
+    function staffDocExists() {
+      return exists(/databases/$(database)/documents/staffUsers/$(request.auth.uid));
+    }
+
+    function staffRole() {
+      return get(/databases/$(database)/documents/staffUsers/$(request.auth.uid)).data;
+    }
+
+    function hasActiveRole(allowedRoles) {
+      return isVerified() &&
+        staffDocExists() &&
+        staffRole().active == true &&
+        staffRole().role in allowedRoles;
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || hasActiveRole(['admin']);
+    }
+
+    function isStaff() {
+      return isBootstrapAdmin() || hasActiveRole(['admin', 'vendedor', 'optometra']);
+    }
+
+    function isOptometrist() {
+      return isAdmin() || hasActiveRole(['optometra']);
+    }
+
+    function isSeller() {
+      return isAdmin() || hasActiveRole(['vendedor']);
+    }
+
+    // --- Validation Blueprints ---
+
+    function isValidStaffUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'active', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'displayName', 'role', 'active', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 180 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120 &&
+        data.role in ['pending', 'admin', 'vendedor', 'optometra'] &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPatient(data) {
+      return data.keys().hasAll(['fullName', 'dni', 'phone', 'email', 'insuranceName', 'notes', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['fullName', 'dni', 'phone', 'email', 'insuranceName', 'notes', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120 &&
+        data.dni is string && data.dni.size() >= 4 && data.dni.size() <= 24 && data.dni.matches('^[a-zA-Z0-9.\\-]+$') &&
+        data.phone is string && data.phone.size() >= 5 && data.phone.size() <= 32 &&
+        data.email is string && data.email.size() <= 180 &&
+        data.insuranceName is string && data.insuranceName.size() <= 100 &&
+        data.notes is string && data.notes.size() <= 1000 &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidEyeRx(eye) {
+      return eye is map &&
+        eye.keys().hasAll(['sphere', 'cylinder', 'axis', 'addition', 'pd', 'prism']) &&
+        eye.keys().hasOnly(['sphere', 'cylinder', 'axis', 'addition', 'pd', 'prism', 'height']) &&
+        eye.sphere is string && eye.sphere.size() <= 16 &&
+        eye.cylinder is string && eye.cylinder.size() <= 16 &&
+        eye.axis is string && eye.axis.size() <= 16 &&
+        eye.addition is string && eye.addition.size() <= 16 &&
+        eye.pd is string && eye.pd.size() <= 16 &&
+        (!('height' in eye) || (eye.height is string && eye.height.size() <= 16)) &&
+        eye.prism is string && eye.prism.size() <= 32;
+    }
+
+    function isValidPrescription(data) {
+      return data.keys().hasAll(['patientId', 'patientName', 'optometristId', 'optometristName', 'examDate', 'lensType', 'od', 'oi', 'notes', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['patientId', 'patientName', 'optometristId', 'optometristName', 'examDate', 'lensType', 'od', 'oi', 'notes', 'createdAt', 'updatedAt']) &&
+        isValidId(data.patientId) &&
+        data.patientName is string && data.patientName.size() >= 2 && data.patientName.size() <= 120 &&
+        isValidId(data.optometristId) &&
+        data.optometristName is string && data.optometristName.size() >= 1 && data.optometristName.size() <= 120 &&
+        data.examDate is string && data.examDate.size() >= 8 && data.examDate.size() <= 20 &&
+        data.lensType in ['Monofocal', 'Bifocal', 'Progresivo', 'Lentes de Contacto', 'Ocupacional'] &&
+        isValidEyeRx(data.od) &&
+        isValidEyeRx(data.oi) &&
+        data.notes is string && data.notes.size() <= 1000 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll(['patientId', 'patientName', 'patientPhone', 'optometristName', 'scheduledAt', 'reason', 'status', 'notes', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['patientId', 'patientName', 'patientPhone', 'optometristName', 'scheduledAt', 'reason', 'status', 'notes', 'createdBy', 'createdAt', 'updatedAt']) &&
+        isValidId(data.patientId) &&
+        data.patientName is string && data.patientName.size() >= 2 && data.patientName.size() <= 120 &&
+        data.patientPhone is string && data.patientPhone.size() <= 32 &&
+        data.optometristName is string && data.optometristName.size() >= 1 && data.optometristName.size() <= 120 &&
+        data.scheduledAt is string && data.scheduledAt.size() >= 10 && data.scheduledAt.size() <= 32 &&
+        data.reason is string && data.reason.size() >= 2 && data.reason.size() <= 160 &&
+        data.status in ['scheduled', 'waiting', 'completed', 'cancelled'] &&
+        data.notes is string && data.notes.size() <= 500 &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidInventoryItem(data) {
+      return data.keys().hasAll(['sku', 'category', 'brand', 'model', 'specs', 'costPrice', 'salePrice', 'stock', 'minStock', 'active', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['sku', 'category', 'brand', 'model', 'specs', 'costPrice', 'salePrice', 'stock', 'minStock', 'active', 'createdAt', 'updatedAt']) &&
+        data.sku is string && data.sku.size() >= 2 && data.sku.size() <= 48 && data.sku.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.category in ['frame', 'lens', 'contact_lens', 'accessory'] &&
+        data.brand is string && data.brand.size() >= 1 && data.brand.size() <= 80 &&
+        data.model is string && data.model.size() >= 1 && data.model.size() <= 120 &&
+        data.specs is string && data.specs.size() <= 160 &&
+        data.costPrice is number && data.costPrice >= 0 &&
+        data.salePrice is number && data.salePrice >= 0 &&
+        data.stock is number && data.stock >= 0 &&
+        data.minStock is number && data.minStock >= 0 &&
+        data.active is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidQuote(data) {
+      return data.keys().hasAll(['quoteNumber', 'patientId', 'patientName', 'prescriptionId', 'sellerId', 'sellerName', 'items', 'discount', 'totalAmount', 'status', 'notes', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['quoteNumber', 'patientId', 'patientName', 'prescriptionId', 'sellerId', 'sellerName', 'items', 'discount', 'totalAmount', 'status', 'notes', 'createdAt', 'updatedAt']) &&
+        data.quoteNumber is string && data.quoteNumber.size() >= 2 && data.quoteNumber.size() <= 32 &&
+        isValidId(data.patientId) &&
+        data.patientName is string && data.patientName.size() >= 2 && data.patientName.size() <= 120 &&
+        data.prescriptionId is string && data.prescriptionId.size() <= 128 &&
+        isValidId(data.sellerId) &&
+        data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120 &&
+        data.items is list && data.items.size() >= 1 && data.items.size() <= 20 &&
+        data.items[0] is map &&
+        data.discount is number && data.discount >= 0 &&
+        data.totalAmount is number && data.totalAmount >= 0 &&
+        data.status in ['draft', 'sent', 'approved', 'converted', 'expired'] &&
+        data.notes is string && data.notes.size() <= 500 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidWorkOrder(data) {
+      return data.keys().hasAll(['orderNumber', 'patientId', 'patientName', 'prescriptionId', 'quoteId', 'sellerId', 'sellerName', 'labName', 'frameSummary', 'lensSummary', 'promisedDate', 'status', 'totalAmount', 'paidAmount', 'balanceDue', 'notes', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['orderNumber', 'patientId', 'patientName', 'prescriptionId', 'quoteId', 'sellerId', 'sellerName', 'labName', 'frameSummary', 'lensSummary', 'promisedDate', 'status', 'totalAmount', 'paidAmount', 'balanceDue', 'notes', 'createdAt', 'updatedAt']) &&
+        data.orderNumber is string && data.orderNumber.size() >= 2 && data.orderNumber.size() <= 32 &&
+        isValidId(data.patientId) &&
+        data.patientName is string && data.patientName.size() >= 2 && data.patientName.size() <= 120 &&
+        data.prescriptionId is string && data.prescriptionId.size() <= 128 &&
+        data.quoteId is string && data.quoteId.size() <= 128 &&
+        isValidId(data.sellerId) &&
+        data.sellerName is string && data.sellerName.size() >= 1 && data.sellerName.size() <= 120 &&
+        data.labName is string && data.labName.size() >= 1 && data.labName.size() <= 100 &&
+        data.frameSummary is string && data.frameSummary.size() <= 200 &&
+        data.lensSummary is string && data.lensSummary.size() <= 200 &&
+        data.promisedDate is string && data.promisedDate.size() >= 8 && data.promisedDate.size() <= 20 &&
+        data.status in ['pending', 'in_lab', 'quality_check', 'ready', 'delivered'] &&
+        data.totalAmount is number && data.totalAmount >= 0 &&
+        data.paidAmount is number && data.paidAmount >= 0 &&
+        data.balanceDue is number && data.balanceDue >= 0 &&
+        data.notes is string && data.notes.size() <= 600 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCashMovement(data) {
+      return data.keys().hasAll(['type', 'category', 'amount', 'paymentMethod', 'description', 'workOrderId', 'patientName', 'userId', 'userName', 'closed', 'createdAt']) &&
+        data.keys().hasOnly(['type', 'category', 'amount', 'paymentMethod', 'description', 'workOrderId', 'patientName', 'userId', 'userName', 'closed', 'createdAt']) &&
+        data.type in ['income', 'expense', 'closing'] &&
+        data.category in ['sale_deposit', 'balance_payment', 'direct_sale', 'supplier', 'operating_expense', 'daily_closing'] &&
+        data.amount is number && data.amount >= 0 &&
+        data.paymentMethod in ['cash', 'card', 'transfer', 'current_account'] &&
+        data.description is string && data.description.size() >= 2 && data.description.size() <= 240 &&
+        data.workOrderId is string && data.workOrderId.size() <= 128 &&
+        data.patientName is string && data.patientName.size() <= 120 &&
+        isValidId(data.userId) &&
+        data.userName is string && data.userName.size() >= 1 && data.userName.size() <= 120 &&
+        data.closed is bool &&
+        data.createdAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    match /staffUsers/{userId} {
+      allow get: if isValidId(userId) && isVerified() && (request.auth.uid == userId || isAdmin());
+      allow list: if isVerified() && (resource.data.uid == request.auth.uid || isAdmin());
+
+      allow create: if isValidId(userId) && isVerified() && isValidStaffUser(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (
+          (isAdmin() && incoming().uid == userId) ||
+          (
+            request.auth.uid == userId &&
+            incoming().uid == request.auth.uid &&
+            (
+              (isBootstrapAdmin() && incoming().role == 'admin' && incoming().active == true) ||
+              (!isBootstrapAdmin() && incoming().role == 'pending' && incoming().active == false)
+            )
+          )
+        );
+
+      allow update: if isValidId(userId) && isVerified() && isValidStaffUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().email == existing().email &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'active', 'updatedAt'])) ||
+          (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(userId) && isAdmin() && userId != request.auth.uid;
+    }
+
+    match /patients/{patientId} {
+      allow get: if isValidId(patientId) && isStaff();
+      allow list: if isStaff();
+
+      allow create: if isValidId(patientId) && isStaff() && isValidPatient(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(patientId) && isStaff() && isValidPatient(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'dni', 'phone', 'email', 'insuranceName', 'notes', 'updatedAt'])
+        );
+
+      allow delete: if isValidId(patientId) && isAdmin();
+    }
+
+    match /prescriptions/{prescriptionId} {
+      allow get: if isValidId(prescriptionId) && isStaff();
+      allow list: if isStaff();
+
+      allow create: if isValidId(prescriptionId) && isOptometrist() && isValidPrescription(incoming()) &&
+        incoming().optometristId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/patients/$(incoming().patientId));
+
+      allow update: if isValidId(prescriptionId) && isOptometrist() && isValidPrescription(incoming()) &&
+        incoming().patientId == existing().patientId &&
+        incoming().optometristId == existing().optometristId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            existing().optometristId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['lensType', 'od', 'oi', 'notes', 'examDate', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isValidId(prescriptionId) && (
+        isAdmin() ||
+        (isOptometrist() && existing().optometristId == request.auth.uid)
+      );
+    }
+
+    match /appointments/{appointmentId} {
+      allow get: if isValidId(appointmentId) && isStaff();
+      allow list: if isStaff();
+
+      allow create: if isValidId(appointmentId) && isStaff() && isValidAppointment(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().status == 'scheduled' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/patients/$(incoming().patientId));
+
+      allow update: if isValidId(appointmentId) && isStaff() && isValidAppointment(incoming()) &&
+        incoming().patientId == existing().patientId &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            !(existing().status in ['completed', 'cancelled']) &&
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+              incoming().diff(existing()).affectedKeys().hasOnly(['scheduledAt', 'optometristName', 'reason', 'notes', 'updatedAt'])
+            )
+          )
+        );
+
+      allow delete: if isValidId(appointmentId) && isStaff();
+    }
+
+    match /inventoryItems/{itemId} {
+      allow get: if isValidId(itemId) && isStaff();
+      allow list: if isStaff();
+
+      allow create: if isValidId(itemId) && isAdmin() && isValidInventoryItem(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isValidId(itemId) && isValidInventoryItem(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['sku', 'category', 'brand', 'model', 'specs', 'costPrice', 'salePrice', 'stock', 'minStock', 'active', 'updatedAt'])) ||
+          (isSeller() && incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(itemId) && isAdmin();
+    }
+
+    match /quotes/{quoteId} {
+      allow get: if isValidId(quoteId) && isStaff();
+      allow list: if isStaff();
+
+      allow create: if isValidId(quoteId) && isSeller() && isValidQuote(incoming()) &&
+        incoming().sellerId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/patients/$(incoming().patientId));
+
+      allow update: if isValidId(quoteId) && isSeller() && isValidQuote(incoming()) &&
+        incoming().patientId == existing().patientId &&
+        incoming().sellerId == existing().sellerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            existing().status != 'converted' &&
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+              incoming().diff(existing()).affectedKeys().hasOnly(['items', 'discount', 'totalAmount', 'notes', 'status', 'updatedAt'])
+            )
+          )
+        );
+
+      allow delete: if isValidId(quoteId) && isAdmin();
+    }
+
+    match /workOrders/{orderId} {
+      allow get: if isValidId(orderId) && isStaff();
+      allow list: if isStaff();
+
+      allow create: if isValidId(orderId) && isSeller() && isValidWorkOrder(incoming()) &&
+        incoming().sellerId == request.auth.uid &&
+        incoming().status == 'pending' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/patients/$(incoming().patientId));
+
+      allow update: if isValidId(orderId) && isSeller() && isValidWorkOrder(incoming()) &&
+        incoming().patientId == existing().patientId &&
+        incoming().sellerId == existing().sellerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          isAdmin() ||
+          (
+            existing().status != 'delivered' &&
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+              incoming().diff(existing()).affectedKeys().hasOnly(['paidAmount', 'balanceDue', 'status', 'updatedAt']) ||
+              incoming().diff(existing()).affectedKeys().hasOnly(['labName', 'promisedDate', 'notes', 'updatedAt'])
+            )
+          )
+        );
+
+      allow delete: if isValidId(orderId) && (
+        isAdmin() ||
+        (isSeller() && existing().status != 'delivered')
+      );
+    }
+
+    match /cashMovements/{movementId} {
+      allow get: if isValidId(movementId) && isSeller();
+      allow list: if isSeller();
+
+      allow create: if isValidId(movementId) && isSeller() && isValidCashMovement(incoming()) &&
+        incoming().userId == request.auth.uid &&
+        incoming().createdAt == request.time;
+
+      allow update: if isValidId(movementId) && isSeller() && isValidCashMovement(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().amount == existing().amount &&
+        incoming().type == existing().type &&
+        (
+          isAdmin() ||
+          (existing().closed == false && incoming().diff(existing()).affectedKeys().hasOnly(['closed']))
+        );
+
+      allow delete: if isValidId(movementId) && isAdmin();
+    }
+  }
+}

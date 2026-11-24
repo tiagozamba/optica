@@ -1,0 +1,521 @@
+{
+  "entities": {
+    "StaffUser": {
+      "title": "StaffUser",
+      "description": "Perfil de usuario del equipo de la óptica con rol asignado y estado de habilitación.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 180
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["pending", "admin", "vendedor", "optometra"]
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "active", "createdAt", "updatedAt"]
+    },
+    "Patient": {
+      "title": "Patient",
+      "description": "Ficha de paciente de la óptica con datos de contacto y cobertura médica.",
+      "type": "object",
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "dni": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 24,
+          "pattern": "^[a-zA-Z0-9.\\-]+$"
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 32
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "insuranceName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["fullName", "dni", "phone", "email", "insuranceName", "notes", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Prescription": {
+      "title": "Prescription",
+      "description": "Receta óptica clínica con graduación OD/OI, adición, DNP y observaciones de gabinete.",
+      "type": "object",
+      "properties": {
+        "patientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "patientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "optometristId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "optometristName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "examDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "lensType": {
+          "type": "string",
+          "enum": ["Monofocal", "Bifocal", "Progresivo", "Lentes de Contacto", "Ocupacional"]
+        },
+        "od": {
+          "type": "object",
+          "description": "Graduación Ojo Derecho (sphere, cylinder, axis, addition, pd, height, prism)"
+        },
+        "oi": {
+          "type": "object",
+          "description": "Graduación Ojo Izquierdo (sphere, cylinder, axis, addition, pd, height, prism)"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["patientId", "patientName", "optometristId", "optometristName", "examDate", "lensType", "od", "oi", "notes", "createdAt", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Turno programado para gabinete optométrico o control de lentes.",
+      "type": "object",
+      "properties": {
+        "patientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "patientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "patientPhone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "optometristName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "scheduledAt": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 32
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 160
+        },
+        "status": {
+          "type": "string",
+          "enum": ["scheduled", "waiting", "completed", "cancelled"]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdBy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["patientId", "patientName", "patientPhone", "optometristName", "scheduledAt", "reason", "status", "notes", "createdBy", "createdAt", "updatedAt"]
+    },
+    "InventoryItem": {
+      "title": "InventoryItem",
+      "description": "Artículo de inventario óptico: armazón, cristal, lente de contacto o accesorio.",
+      "type": "object",
+      "properties": {
+        "sku": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 48,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "category": {
+          "type": "string",
+          "enum": ["frame", "lens", "contact_lens", "accessory"]
+        },
+        "brand": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "specs": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "costPrice": {
+          "type": "number"
+        },
+        "salePrice": {
+          "type": "number"
+        },
+        "stock": {
+          "type": "number"
+        },
+        "minStock": {
+          "type": "number"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["sku", "category", "brand", "model", "specs", "costPrice", "salePrice", "stock", "minStock", "active", "createdAt", "updatedAt"]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Presupuesto de mostrador vinculando paciente, receta opcional e ítems cotizados.",
+      "type": "object",
+      "properties": {
+        "quoteNumber": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 32
+        },
+        "patientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "patientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "prescriptionId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "sellerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sellerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "items": {
+          "type": "array"
+        },
+        "discount": {
+          "type": "number"
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "sent", "approved", "converted", "expired"]
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["quoteNumber", "patientId", "patientName", "prescriptionId", "sellerId", "sellerName", "items", "discount", "totalAmount", "status", "notes", "createdAt", "updatedAt"]
+    },
+    "WorkOrder": {
+      "title": "WorkOrder",
+      "description": "Orden de trabajo de laboratorio con estado secuencial, entrega prometida y saldo de cobro.",
+      "type": "object",
+      "properties": {
+        "orderNumber": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 32
+        },
+        "patientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "patientName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "prescriptionId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "quoteId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "sellerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sellerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "labName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "frameSummary": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "lensSummary": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "promisedDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "in_lab", "quality_check", "ready", "delivered"]
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "paidAmount": {
+          "type": "number"
+        },
+        "balanceDue": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 600
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["orderNumber", "patientId", "patientName", "prescriptionId", "quoteId", "sellerId", "sellerName", "labName", "frameSummary", "lensSummary", "promisedDate", "status", "totalAmount", "paidAmount", "balanceDue", "notes", "createdAt", "updatedAt"]
+    },
+    "CashMovement": {
+      "title": "CashMovement",
+      "description": "Movimiento de caja diario (ingreso por venta/seña, egreso o cierre de turno).",
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["income", "expense", "closing"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["sale_deposit", "balance_payment", "direct_sale", "supplier", "operating_expense", "daily_closing"]
+        },
+        "amount": {
+          "type": "number"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["cash", "card", "transfer", "current_account"]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 240
+        },
+        "workOrderId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "patientName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "userId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "userName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "closed": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["type", "category", "amount", "paymentMethod", "description", "workOrderId", "patientName", "userId", "userName", "closed", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/staffUsers/{userId}": {
+      "schema": {
+        "$ref": "#/entities/StaffUser"
+      },
+      "description": "Cuentas del personal de la óptica y su rol operativo (admin, vendedor, optometra o pending)."
+    },
+    "/patients/{patientId}": {
+      "schema": {
+        "$ref": "#/entities/Patient"
+      },
+      "description": "Padrón de pacientes con información clínica de contacto y obra social."
+    },
+    "/prescriptions/{prescriptionId}": {
+      "schema": {
+        "$ref": "#/entities/Prescription"
+      },
+      "description": "Recetas ópticas emitidas por optómetras vinculadas a pacientes."
+    },
+    "/appointments/{appointmentId}": {
+      "schema": {
+        "$ref": "#/entities/Appointment"
+      },
+      "description": "Agenda de turnos para exámenes visuales y entregas."
+    },
+    "/inventoryItems/{itemId}": {
+      "schema": {
+        "$ref": "#/entities/InventoryItem"
+      },
+      "description": "Catálogo de armazones, cristales, lentes de contacto y accesorios."
+    },
+    "/quotes/{quoteId}": {
+      "schema": {
+        "$ref": "#/entities/Quote"
+      },
+      "description": "Presupuestos de mostrador generados por vendedores."
+    },
+    "/workOrders/{orderId}": {
+      "schema": {
+        "$ref": "#/entities/WorkOrder"
+      },
+      "description": "Órdenes de trabajo y seguimiento en laboratorio."
+    },
+    "/cashMovements/{movementId}": {
+      "schema": {
+        "$ref": "#/entities/CashMovement"
+      },
+      "description": "Movimientos financieros de caja, señas, saldos y cierres."
+    }
+  }
+}
