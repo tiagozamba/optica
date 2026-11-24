@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  signOut,
+  type User,
+} from 'firebase/auth';
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
-import { Clock3, Eye, LogOut, ShieldCheck } from 'lucide-react';
+import { Clock3, Eye, Lock, LogOut, Mail, ShieldCheck } from 'lucide-react';
 import {
   auth,
   BOOTSTRAP_ADMIN_EMAIL,
@@ -27,6 +34,10 @@ export function AuthGate({ children }: AuthGateProps) {
   const [authError, setAuthError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
 
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
@@ -51,7 +62,7 @@ export function AuthGate({ children }: AuthGateProps) {
       async (snapshot) => {
         if (!snapshot.exists()) {
           const isBootstrap =
-            firebaseUser.emailVerified && firebaseUser.email === BOOTSTRAP_ADMIN_EMAIL;
+            firebaseUser.email?.toLowerCase() === BOOTSTRAP_ADMIN_EMAIL?.toLowerCase();
           const fallbackName =
             firebaseUser.displayName?.trim() ||
             firebaseUser.email?.split('@')[0] ||
@@ -106,7 +117,39 @@ export function AuthGate({ children }: AuthGateProps) {
       } else if (msg.includes('popup-blocked')) {
         setAuthError('El navegador bloqueó la ventana emergente. Habilitá las ventanas emergentes para continuar.');
       } else {
-        setAuthError('No pudimos validar tu cuenta con Google. Intentá nuevamente.');
+        setAuthError(`Error de Google (${msg}). Usá el ingreso con correo y contraseña de abajo.`);
+      }
+    } finally {
+      setSignInBusy(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !password.trim()) {
+      setAuthError('Completá tu correo electrónico y contraseña.');
+      return;
+    }
+    setAuthError(null);
+    setSignInBusy(true);
+    try {
+      if (isRegistering) {
+        await createUserWithEmailAndPassword(auth, email.trim(), password);
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : 'Error de autenticación.';
+      if (msg.includes('invalid-credential') || msg.includes('wrong-password') || msg.includes('user-not-found')) {
+        setAuthError('Correo o contraseña incorrectos. Si es tu primera vez, tocá "Crear cuenta nueva" abajo.');
+      } else if (msg.includes('email-already-in-use')) {
+        setAuthError('Ese correo ya tiene una cuenta creada. Probá iniciar sesión.');
+      } else if (msg.includes('weak-password')) {
+        setAuthError('La contraseña debe tener al menos 6 caracteres.');
+      } else if (msg.includes('operation-not-allowed')) {
+        setAuthError('Falta activar "Correo electrónico/contraseña" en Firebase Authentication.');
+      } else {
+        setAuthError(`No se pudo ingresar: ${msg}`);
       }
     } finally {
       setSignInBusy(false);
@@ -144,14 +187,14 @@ export function AuthGate({ children }: AuthGateProps) {
             </span>
           </div>
 
-          <div className="max-w-md my-12">
+          <div className="max-w-md my-10">
             <p className="text-xs font-medium text-[#0F4C81] tracking-wide mb-3">
               Gestión clínica y comercial para ópticas
             </p>
             <h1 className="font-display text-3xl sm:text-4xl font-semibold text-slate-900 leading-tight mb-4">
               Gabinete, mostrador y laboratorio en un solo sistema.
             </h1>
-            <p className="text-base text-slate-600 leading-relaxed mb-8">
+            <p className="text-sm text-slate-600 leading-relaxed mb-6">
               Administrá turnos optométricos, recetas con graduación OD/OI, inventario de armazones y cristales, órdenes de taller y arqueo de caja con acceso por roles.
             </p>
 
@@ -161,14 +204,81 @@ export function AuthGate({ children }: AuthGateProps) {
               </div>
             )}
 
+            <form onSubmit={handleEmailAuth} className="space-y-3 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Correo electrónico
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu-correo@gmail.com"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-[#0F4C81]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Contraseña
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Mínimo 6 caracteres"
+                    className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-[#0F4C81]"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={signInBusy}
+                className="w-full inline-flex items-center justify-center gap-2 px-6 py-2.5 bg-[#0F4C81] hover:bg-[#0B3A63] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors cursor-pointer"
+              >
+                {signInBusy
+                  ? 'Procesando...'
+                  : isRegistering
+                    ? 'Crear cuenta e ingresar'
+                    : 'Ingresar con correo'}
+              </button>
+            </form>
+
+            <div className="flex items-center justify-between text-xs mb-5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRegistering(!isRegistering);
+                  setAuthError(null);
+                }}
+                className="text-[#0F4C81] hover:underline font-medium cursor-pointer"
+              >
+                {isRegistering
+                  ? 'Ya tengo cuenta, quiero iniciar sesión'
+                  : '¿Primera vez? Crear cuenta nueva'}
+              </button>
+            </div>
+
+            <div className="relative flex py-2 items-center mb-4">
+              <div className="flex-grow border-t border-slate-200"></div>
+              <span className="flex-shrink mx-3 text-xs text-slate-400">o en versión web</span>
+              <div className="flex-grow border-t border-slate-200"></div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={signInBusy}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-6 py-3 bg-[#0F4C81] hover:bg-[#0B3A63] disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-3 px-6 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 disabled:opacity-60 text-slate-700 text-sm font-medium rounded-lg transition-colors cursor-pointer"
               >
-                <ShieldCheck className="w-4 h-4 shrink-0" />
+                <ShieldCheck className="w-4 h-4 shrink-0 text-[#0F4C81]" />
                 {signInBusy ? 'Conectando con Google...' : 'Ingresar con cuenta Google'}
               </button>
               <PWAInstallButton variant="inline" />
@@ -249,37 +359,4 @@ export function AuthGate({ children }: AuthGateProps) {
 
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm space-y-1.5 mb-6">
             <div className="flex justify-between gap-4">
-              <span className="text-slate-500">Usuario</span>
-              <span className="font-medium text-slate-900 truncate">
-                {staffProfile?.displayName || firebaseUser.displayName}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-slate-500">Correo</span>
-              <span className="font-mono text-xs text-slate-700 truncate">
-                {staffProfile?.email || firebaseUser.email}
-              </span>
-            </div>
-            <div className="flex justify-between gap-4">
-              <span className="text-slate-500">Estado</span>
-              <span className="font-medium text-amber-700">
-                {staffProfile ? ROLE_LABELS[staffProfile.role] : 'Registrando...'}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleSignOut}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg transition-colors cursor-pointer"
-          >
-            <LogOut className="w-4 h-4" />
-            Cerrar sesión
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return <>{children(staffProfile)}</>;
-}
+              <span className="text-slate-500">Usuario
